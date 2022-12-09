@@ -1,4 +1,6 @@
 import argparse
+import pandas as pd
+import os
 from confluent_kafka import Consumer
 from confluent_kafka.serialization import SerializationContext, MessageField
 from confluent_kafka.schema_registry.json_schema import JSONDeserializer
@@ -59,25 +61,30 @@ def main(topic):
 
     consumer = Consumer(consumer_conf)
     consumer.subscribe([topic])
-    count = 0
+    messages = []
     while True:
         try:
             # SIGINT can't be handled when polling, limit timeout to 1 second.
             msg = consumer.poll(1.0)
             if msg is None:
-                print('No of records consumed by consumer 2: ' + str(count))
+                if len(messages) != 0:
+                    df = pd.DataFrame(messages)
+                    if not os.path.isfile("/Users/bharath/Downloads/output.csv"):
+                        df.to_csv("/Users/bharath/Downloads/output.csv", index=False)
+                    else:
+                        df.to_csv("/Users/bharath/Downloads/output.csv", mode='a', header=False, index=False)
+                    messages = []
                 continue
             restaurant = json_deserializer(msg.value(), SerializationContext(msg.topic(), MessageField.VALUE))
 
             if restaurant is not None:
                 print("User record {}: restaurant: {}\n"
                       .format(msg.key(), restaurant))
-                count += 1
+                messages.append(restaurant.record)
 
         except KeyboardInterrupt:
             break
 
     consumer.close()
-
 
 main("restaurent-take-away-data")
